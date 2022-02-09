@@ -25,12 +25,12 @@ async def send_text_with_surb():
         print("....")
         print(text_send)
         print("....")
-        print("sending '{}' (*with* reply SURB) over the mix network...".format(message))
+        print("Sending '{}' (*with* reply SURB) over the mix network...".format(message))
         await websocket.send(text_send)
 
-        print("waiting to receive a message from the mix network...")
+        print("Waiting to receive a message from the mix network...")
         received_message = json.loads(await websocket.recv())
-        print("received '{}' from the mix network".format(
+        print("Received '{}' from the mix network".format(
             received_message["message"]))
 
 
