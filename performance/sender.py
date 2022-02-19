@@ -8,46 +8,54 @@ import config
 import logging
 import sys
 import os
-import signal
-
-assert len(sys.argv) == 3, "Sender must take two parameters: name of the log file and the number of messages per trial"
-
-MESSAGE_PER_TRIAL = int(sys.argv[2])
-LOG_PATH = 'logs/' + sys.argv[1] + '/' + str(MESSAGE_PER_TRIAL)
-
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
+# Check and save system arguments
+assert len(sys.argv) >= 3, "Sender must take at least three parameters: test type (latency or throughput), name of the log file and the number of messages per trial"
+assert sys.argv[2] == 'throughput' or sys.argv[2] == 'latency', "Test type must be 'throughput' or 'latency'"
+throughput_with_surb = None
+if sys.argv[2] == 'throughput':
+    for i in range(len(sys.argv) - 1):
+        if sys.argv[i] == '--surb':
+            throughput_with_surb = sys.argv[i+1]
+        if throughput_with_surb == None:
+            assert "Must provide is throughput test will be using SURB or not. Please do so using a --surb flag. Allowed inputs are 'TRUE' and 'FALSE'"
+        else:
+            assert throughput_with_surb == 'TRUE' or throughput_with_surb == 'FALSE', "Allowed inputs fir the --surb flag are are 'TRUE' and 'FALSE'"
 
-self_address_request = json.dumps({
-    "type": "selfAddress"
-})
+# Set constants
+THROUGHPUT_WITH_SURB = throughput_with_surb
+MESSAGE_PER_TRIAL = int(sys.argv[3])
+TEST_TYPE = sys.argv[2]
+LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] + '/' + str(MESSAGE_PER_TRIAL)
 
-data = {
+# For storing the test results on the run
+latency_data = {
     "sent_text_with_surb_time": dict(),
     "sent_text_without_surb_time": dict(),
     "received_surb_reply_text_time": dict(),
 
 }
+throughput_data = dict()
+
+# The program needs make a self-address query to the client before it starts sending messages
+self_address_request = json.dumps({
+    "type": "selfAddress"
+})
 
 
-def save_to_file():
+def save_to_file(data):
     logging.info('writing to file')
 
-    if not os.path.exists('logs/' + sys.argv[1]):
-        os.mkdir('logs/' + sys.argv[1])
+    if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[1]):
+        os.mkdir(TEST_TYPE + '_logs/' + sys.argv[1])
 
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
 
-    # if os.path.exists(LOG_PATH + '_sender.json'):
-    #     with open(LOG_PATH + '_sender.json', 'a+') as file:
-    #         output = json.loads(file.read())
-    #         output.update({MESSAGE_PER_TRIAL: data})
-    #         json.dump(output, file)
-    # else:
-    #     logging.error('[SENDER] Path does not exist')
     with open(LOG_PATH + '/sender.json', 'w+') as file:
-        json.dump({MESSAGE_PER_TRIAL: data}, file)
+        # json.dump({MESSAGE_PER_TRIAL: data}, file)
+        json.dump(data, file)
         file.close()
     return 1
 
@@ -70,17 +78,17 @@ async def send_text():
 
         # Send messages without SURB
         logging.info("[SENDER] **Starting sending messages *without* SURB**")
-        while count < MESSAGE_PER_TRIAL:
+        while count < 0:
             text_send['message'] = str(count)
             logging.info(
                 "[SENDER] Sending '{}' (*without* reply SURB) over the mix network...".format(text_send['message']))
             await websocket.send(json.dumps(text_send))
-            data["sent_text_without_surb_time"][count] = (time.time())
+            latency_data["sent_text_without_surb_time"][count] = (time.time())
             logging.info(
                 "[SENDER] Waiting to receive a message from the mix network...")
             try:
                 received_message = json.loads(
-                    await asyncio.wait_for(websocket.recv(), timeout=10))
+                    await asyncio.wait_for(websocket.recv(), timeout=20))
             except asyncio.TimeoutError:
                 received_message = {'type': 'timeout'}
             if received_message['type'] == 'error':
@@ -89,8 +97,12 @@ async def send_text():
             elif received_message['type'] == 'timeout':
                 logging.error('Timeout. Assuming ack was received.')
             else:
+                receive_time = time.time()
                 logging.info(
                     "[SENDER] Received message from: {}".format(received_message['message']))
+                if 'with_surb' in received_message['message']:
+                    latency_data['received_surb_reply_text_time'][received_message['message'].split('.')[
+                        0]] = receive_time
             count += 1
 
         count = 0
@@ -103,13 +115,13 @@ async def send_text():
             logging.info(
                 "[SENDER] Sending '{}' (*with* reply SURB) over the mix network...".format(text_send['message']))
             await websocket.send(json.dumps(text_send))
-            data["sent_text_with_surb_time"][count] = time.time()
+            latency_data["sent_text_with_surb_time"][count] = time.time()
             logging.info(
                 "[SENDER] Waiting to receive a message from the mix network...")
 
             try:
                 received_message = json.loads(
-                    await asyncio.wait_for(websocket.recv(), timeout=10))
+                    await asyncio.wait_for(websocket.recv(), timeout=20))
             except asyncio.TimeoutError:
                 received_message = {'type': 'timeout'}
 
@@ -118,16 +130,59 @@ async def send_text():
                     "[SENDER] Received error message from the mix network: {}".format(received_message))
             elif received_message['type'] == 'timeout':
                 logging.error('Timeout. Assuming ack was received.')
-                data["received_surb_reply_text_time"][count] = -1
+                # latency_data["received_surb_reply_text_time"][count] = -1
             else:
+                receive_time = time.time()
                 logging.info(
-                    "[SENDER] Received message from: {}".format(received_message['message']))
-                data['received_surb_reply_text_time'][count] = (time.time())
+                    "[SENDER] Received message from: {}".format(received_message))
+                if 'with_surb' in received_message['message']:
+                    latency_data['received_surb_reply_text_time'][received_message['message'].split('.')[
+                        0]] = receive_time
             count += 1
 
         count = 0
 
-asyncio.get_event_loop().run_until_complete(send_text())
-logging.info("[SENDER] Sender loop complete")
 
-save_to_file()
+async def load_text():
+    global throughput_data
+    count = 0
+    async with websockets.connect(config.SENDER_CLIENT_URI) as websocket:
+        await websocket.send(self_address_request)
+        self_address = json.loads(await websocket.recv())
+        logging.info("[SENDER] Our address is: {}".format(
+            self_address["address"]))
+
+        text_send = {
+            "type": "send",
+            "message": str(count),
+            "recipient": config.RECEIVER_ADDRESS,
+            "withReplySurb": False,
+        }
+
+        text_send['withReplySurb'] = True if THROUGHPUT_WITH_SURB == 'TRUE' else False
+
+        start = time.time()
+        while count < MESSAGE_PER_TRIAL:
+            text_send['message'] = str(count)
+            await websocket.send(json.dumps(text_send))
+            count += 1
+
+        end = time.time()
+        if THROUGHPUT_WITH_SURB == 'TRUE':
+            throughput_data["sent_text_with_surb_time"] = end - start
+            logging.info(
+                'It took {} seconds to send {} messages *with* SURB'.format(throughput_data["sent_text_with_surb_time"], MESSAGE_PER_TRIAL))
+        else:
+            throughput_data["sent_text_without_surb_time"] = end - start
+            logging.info(
+                'It took {} seconds to send {} messages *without* SURB'.format(throughput_data["sent_text_without_surb_time"], MESSAGE_PER_TRIAL))
+
+
+if TEST_TYPE == 'latency':
+    asyncio.get_event_loop().run_until_complete(send_text())
+    save_to_file(latency_data)
+elif TEST_TYPE == 'throughput':
+    asyncio.get_event_loop().run_until_complete(load_text())
+    save_to_file(throughput_data)
+
+logging.info("[SENDER] Sender loop complete")

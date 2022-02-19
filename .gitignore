@@ -1,5 +1,6 @@
 # Custom
-performance/logs/
+performance/latency_logs/
+performance/throughput_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
