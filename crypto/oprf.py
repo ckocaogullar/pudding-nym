@@ -12,179 +12,54 @@ from sympy.combinatorics.named_groups import CyclicGroup
 import math
 import os
 import logging
+import random
 import numpy as np
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 
-'''
-Uses the cryptography library to create group parameters for Diffie-Hellman key exchange if there are no pre-saved parameters
-Returns the saved parameters otherwise
-
-In a real setting, all discovery nodes and users should know and agree on the same prime order.
-For demonstrative purposes, here the value is stored locally and read from a pickle file.
-This module does not deal with making sure that all parties agree on the prime order value.
-'''
-
-parameters = None
-
-
-def get_dh_parameters(generator=2, key_size=2048):
-    global parameters
-    if parameters:
-        pass
-    elif not os.path.exists('store/dh_parameters.json'):
-        logging.info(
-            "There are no saved DH parameters. Creating a new set of group parameters...")
-        parameters = dh.generate_parameters(
-            generator=generator, key_size=key_size)
-        p = parameters.parameter_numbers().p
-        g = parameters.parameter_numbers().g
-        logging.info("Generated new parameters")
-        with open("store/dh_parameters.json", "w") as file:
-            json.dump({'p': p, 'g': g}, file)
-    else:
-        logging.info("Retrieving existing parameters")
-        with open("store/dh_parameters.json", "r") as file:
-            data = json.load(file)
-            pn = dh.DHParameterNumbers(
-                data['p'], data['g'])
-            parameters = pn.parameters()
-    logging.info('Prime order: {}'.format(parameters.parameter_numbers().p))
-    return parameters
+# Based on Cambridge Cryptography lectures, slide 182.
+# p should be a strong prime, I am setting it to value 11 to create a PoC implementation
+# In the prime order subgroup that will be used in this algorithm, p is the prime modulus; g is the generator; and q is the prime order
+def generate_group():
+    p = 11
+    q = int((p-1)/2)
+    while True:
+        x = random.randint(2, p-1)
+        print(x)
+        g = (x*x) % p
+        if g != 1:
+            break
+    return p, q, g
 
 
-def get_prime_order():
-    return get_dh_parameters().parameter_numbers().p
+def generate_private_key(q):
+    return random.randint(1, q - 1)
+
+# To map a hash function output to a group element, I take the generator of the group to the power of the hash
+# (interpreting the hash as an integer)
 
 
-def get_generator():
-    return get_dh_parameters().parameter_numbers().g
+def hash(val, g, p):
+    return (g ** val) % p
 
 
-def generate_public_key(private_key):
-    public_key = private_key.public_key()
-    public_number = public_key.public_numbers().y
-    print("public numbers: {}".format(public_number))
-    return public_number
+def generate_inverse_private_key(key, q):
+    return pow(key, -1, q)
 
 
-def generate_private_key():
-    private_key = get_dh_parameters().generate_private_key()
-    private_number = private_key.private_numbers().x
-    return private_key, private_number
+p, q, g = generate_group()
+user_key = generate_private_key(q)
+inverse_user_key = generate_inverse_private_key(user_key, q)
+server_key = generate_private_key(q)
+val = 13
+blinded_hash = pow(hash(val, g, p), user_key) % p
+server_comp = pow(blinded_hash, server_key) % p
+unblinded_hash = pow(server_comp, inverse_user_key) % p
+print('blinded_hash', blinded_hash)
+print('server_comp', server_comp)
+print('unblinded_hash', unblinded_hash)
 
+server_alone_comp = pow(hash(val, g, p), server_key) % p
+print('server_alone_comp', server_alone_comp)
 
-def _fast_exp(base, exp, order):
-    print('base: {}'.format(base))
-    print('exp: {}'.format(exp))
-    print('order: {}'.format(order))
-    x = base
-    y = base if exp % 2 else 1
-    exp = exp // 2
-    while exp > 0:
-        assert x != 0
-        x = (x * x) % order
-        if exp % 2:
-            y = x if y == 1 else (x * y) % order
-        exp = exp // 2
-    return y
-
-
-def lcm(a, b):
-    return abs(a*b) // math.gcd(a, b)
-
-
-def multiplicative_cyclic_group_pow(base, exp, order):
-    # if type(base) is bytes:
-    #     base = int.from_bytes(base, byteorder='big')
-    # return _fast_exp(base, exp, order)
-    return pow(base, exp, order)
-
-
-def additive_cyclic_group_pow(base, exp, order):
-    return (base * exp) % order
-
-
-def get_inverse_user_priv_key(msg, key, order):
-    # Additive inverse
-    # return order - key
-
-    # Multiplicative inverse
-    return pow(key, -1, order - 1)
-
-
-def cyclic_group_root(num, root, order):
-    with localcontext() as ctx:
-        # return ctx.power(num, 1 / Decimal(root))
-        a = Decimal(num).ln() / Decimal(root)
-        res_up = a.exp().quantize(Decimal('1.'), rounding=ROUND_UP)
-        res_down = a.exp().quantize(Decimal('1.'), rounding=ROUND_DOWN)
-        if ctx.power(res_up, root) == num:
-            return res_up
-        elif ctx.power(res_down, root) == num:
-            return res_down
-        logging.error("Could not find the {}th root of {}".format(root, num))
-
-
-def log(log_base, input, mod):
-    n = 1
-    while log_base ** n % mod != input:
-        n += 1
-    return n
-
-
-def hash(data, order, algorithm=hashes.SHA256()):
-    if type(data) is str:
-        data = bytes(data, 'UTF-8')
-    digest = hashes.Hash(algorithm)
-    digest.update(data)
-    return int.from_bytes(digest.finalize(), byteorder='big') % order
-
-
-def keyed_hash(key, data, algorithm=hashes.SHA256()):
-    h = hmac.HMAC(key, algorithm)
-    h.update(data)
-    signature = h.finalize()
-    signature
-
-
-user_priv_dh_key, user_priv_key = generate_private_key()
-if user_priv_key % 2 == 0:
-    user_priv_key += 1
-print('user_priv_key {}'.format(user_priv_key))
-discovery_server_priv_dh_key, discovery_server_priv_key = generate_private_key()
-print('discovery_server_priv_key {}'.format(discovery_server_priv_key))
-prime_order = get_prime_order()
-assert user_priv_key < prime_order
-assert discovery_server_priv_key < prime_order
-print('prime_order: {}'.format(prime_order))
-
-# user_priv_key = 11
-# discovery_server_priv_key = 9
-# prime_order = 37
-# msg = 2
-
-msg = hash('hey', prime_order)
-inverse_user_priv_key = get_inverse_user_priv_key(
-    msg, user_priv_key, prime_order)
-#assert inverse_user_priv_key + user_priv_key == prime_order
-
-print('inverse user private key {}'.format(inverse_user_priv_key))
-
-# Simulate a real OPRF evaluation
-blinded_exp = multiplicative_cyclic_group_pow(msg, user_priv_key, prime_order)
-print('blinded exp {}'.format(blinded_exp))
-server_response = multiplicative_cyclic_group_pow(
-    blinded_exp, discovery_server_priv_key, prime_order)
-print('server resp {}'.format(server_response))
-unblinded_exp = multiplicative_cyclic_group_pow(
-    server_response, inverse_user_priv_key, prime_order)
-
-# If the discovery server computed the value by itself
-discovery_server_comp = multiplicative_cyclic_group_pow(
-    msg, discovery_server_priv_key, prime_order)
-
-print('Unblinded exp {}'.format(unblinded_exp))
-print('Discovery server computation {}'.format(discovery_server_comp))
-
-assert unblinded_exp == discovery_server_comp
+assert server_alone_comp == unblinded_hash
