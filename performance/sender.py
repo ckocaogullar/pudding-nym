@@ -21,13 +21,24 @@ if sys.argv[2] == 'throughput':
         if throughput_with_surb == None:
             assert "Must provide is throughput test will be using SURB or not. Please do so using a --surb flag. Allowed inputs are 'TRUE' and 'FALSE'"
         else:
-            assert throughput_with_surb == 'TRUE' or throughput_with_surb == 'FALSE', "Allowed inputs fir the --surb flag are are 'TRUE' and 'FALSE'"
+            assert throughput_with_surb == 'TRUE' or throughput_with_surb == 'FALSE', "Allowed inputs for the --surb flag are are 'TRUE' and 'FALSE'"
 
 # Set constants
 THROUGHPUT_WITH_SURB = throughput_with_surb
 MESSAGE_PER_TRIAL = int(sys.argv[3])
 TEST_TYPE = sys.argv[2]
-LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] + '/' + str(MESSAGE_PER_TRIAL)
+surb_folder = None
+
+if TEST_TYPE == 'latency':
+    surb_folder = ''
+elif TEST_TYPE == 'throughput':
+    if THROUGHPUT_WITH_SURB == 'TRUE':
+        surb_folder = 'with_surb/'
+    else:
+        surb_folder = 'without_surb/'
+
+LOG_PATH = TEST_TYPE + '_logs/' + \
+    sys.argv[1] + '/' + surb_folder + str(MESSAGE_PER_TRIAL)
 
 # For storing the test results on the run
 latency_data = {
@@ -45,10 +56,13 @@ self_address_request = json.dumps({
 
 
 def save_to_file(data):
-    logging.info('writing to file')
+    logging.info('[SENDER] Writing to file')
 
     if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[1]):
         os.mkdir(TEST_TYPE + '_logs/' + sys.argv[1])
+
+    if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[1] + '/' + surb_folder):
+        os.mkdir(TEST_TYPE + '_logs/' + sys.argv[1] + '/' + surb_folder)
 
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
@@ -78,7 +92,7 @@ async def send_text():
 
         # Send messages without SURB
         logging.info("[SENDER] **Starting sending messages *without* SURB**")
-        while count < 0:
+        while count < MESSAGE_PER_TRIAL:
             text_send['message'] = str(count)
             logging.info(
                 "[SENDER] Sending '{}' (*without* reply SURB) over the mix network...".format(text_send['message']))
@@ -171,12 +185,45 @@ async def load_text():
         if THROUGHPUT_WITH_SURB == 'TRUE':
             throughput_data["sent_text_with_surb_time"] = end - start
             logging.info(
-                'It took {} seconds to send {} messages *with* SURB'.format(throughput_data["sent_text_with_surb_time"], MESSAGE_PER_TRIAL))
+                '[SENDER] It took {} seconds to send {} messages *with* SURB'.format(throughput_data["sent_text_with_surb_time"], MESSAGE_PER_TRIAL))
+
+            # After sending all messages with SURB, wait for the receiver to send SURB replies
+            start = time.time()
+            count = 0
+            received_message_cnt = 0
+            # I observed that once the receiver ramps up the SURB messages, some of them fail to make their way to the sender
+            # I don't know why yet.
+            # I give a timeout value to await to prevent the sender being stuck waiting for SURB messages.
+            # But it takes too long to wait for each lost SURB. Also, I observed that once the sender gets a timeout,
+            # It does not receive any more SURBs. For that reason, I stop waiting after a few timeouts.
+            timeout_cnt = 0
+            received_surb_indexes = list()
+            while count < MESSAGE_PER_TRIAL and timeout_cnt < 5:
+                if count == 0:
+                    received_message = json.loads(await websocket.recv())
+                    received_surb_indexes.append(
+                        (received_message['message'], time.time()))
+                    end = time.time()
+                else:
+                    try:
+                        received_message = json.loads(await asyncio.wait_for(websocket.recv(), timeout=10))
+                        received_surb_indexes.append(
+                            (received_message['message'], time.time()))
+                        received_message_cnt += 1
+                        end = time.time()
+                    except asyncio.TimeoutError:
+                        logging.info(
+                            '[SENDER] Timeout while waitng for SURB messages')
+                        timeout_cnt += 1
+                count += 1
+            throughput_data["received_surb_time"] = (
+                received_message_cnt, end - start)
+            logging.info(
+                '[SENDER] Received {} SURB replies in {} seconds'.format(received_message_cnt, end - start))
         else:
             throughput_data["sent_text_without_surb_time"] = end - start
             logging.info(
-                'It took {} seconds to send {} messages *without* SURB'.format(throughput_data["sent_text_without_surb_time"], MESSAGE_PER_TRIAL))
-
+                '[SENDER] It took {} seconds to send {} messages *without* SURB'.format(throughput_data["sent_text_without_surb_time"], MESSAGE_PER_TRIAL))
 
 if TEST_TYPE == 'latency':
     asyncio.get_event_loop().run_until_complete(send_text())

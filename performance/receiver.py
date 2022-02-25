@@ -22,13 +22,25 @@ if sys.argv[2] == 'throughput':
         if throughput_with_surb == None:
             assert "Must provide is throughput test will be using SURB or not. Please do so using a --surb flag. Allowed inputs are 'TRUE' and 'FALSE'"
         else:
-            assert throughput_with_surb == 'TRUE' or throughput_with_surb == 'FALSE', "Allowed inputs fir the --surb flag are are 'TRUE' and 'FALSE'"
+            assert throughput_with_surb == 'TRUE' or throughput_with_surb == 'FALSE', "Allowed inputs for the --surb flag are are 'TRUE' and 'FALSE'"
 
 # Set constants
 THROUGHPUT_WITH_SURB = throughput_with_surb
 MESSAGE_PER_TRIAL = int(sys.argv[3])
 TEST_TYPE = sys.argv[2]
-LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] + '/' + str(MESSAGE_PER_TRIAL)
+
+surb_folder = None
+
+if TEST_TYPE == 'latency':
+    surb_folder = ''
+elif TEST_TYPE == 'throughput':
+    if THROUGHPUT_WITH_SURB == 'TRUE':
+        surb_folder = 'with_surb/'
+    else:
+        surb_folder = 'without_surb/'
+
+LOG_PATH = TEST_TYPE + '_logs/' + \
+    sys.argv[1] + '/' + surb_folder + str(MESSAGE_PER_TRIAL)
 
 # For storing the test results on the run
 latency_data = {
@@ -45,10 +57,13 @@ self_address_request = json.dumps({
 
 
 def save_to_file(data):
-    logging.info('writing to file')
+    logging.info('[RECEIVER] Writing to file')
 
     if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[1]):
         os.mkdir(TEST_TYPE + '_logs/' + sys.argv[1])
+
+    if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[1] + '/' + surb_folder):
+        os.mkdir(TEST_TYPE + '_logs/' + sys.argv[1] + '/' + surb_folder)
 
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
@@ -127,7 +142,6 @@ async def reply_text():
 
 async def receive_text():
     global latency_data
-    start = time.time()
     count = 0
 
     async with websockets.connect(config.RECEIVER_CLIENT_URI) as websocket:
@@ -135,21 +149,47 @@ async def receive_text():
         self_address = json.loads(await websocket.recv())
         logging.info("[RECEIVER] Our address is: {}".format(
             self_address['address']))
-        while count < MESSAGE_PER_TRIAL:
-            await websocket.recv()
-            # logging.info("[RECEIVER] Received message number {}".format(count))
-            count += 1
+        start = time.time()
+        if THROUGHPUT_WITH_SURB == 'FALSE':
+            while count < MESSAGE_PER_TRIAL:
+                await websocket.recv()
+                # logging.info("[RECEIVER] Received message number {}".format(count))
+                count += 1
+        else:
+            received_messages = list()
+            while count < MESSAGE_PER_TRIAL:
+                received_messages.append(await websocket.recv())
+                # logging.info("[RECEIVER] Received message number {}".format(count))
+                count += 1
 
-    end = time.time()
+        end = time.time()
 
-    if THROUGHPUT_WITH_SURB == 'TRUE':
-        throughput_data["received_surb_text_time"] = end - start
-        logging.info(
-            'It took {} seconds to receive {} messages *with* SURB'.format(throughput_data["received_surb_text_time"], MESSAGE_PER_TRIAL))
-    else:
-        throughput_data["received_text_time"] = end - start
-        logging.info(
-            'It took {} seconds to receive {} messages *without* SURB'.format(throughput_data["received_text_time"], MESSAGE_PER_TRIAL))
+        if THROUGHPUT_WITH_SURB == 'TRUE':
+            throughput_data["received_text_with_surb_time"] = end - start
+            logging.info(
+                '[RECEIVER] It took {} seconds to receive {} messages *with* SURB'.format(throughput_data["received_text_with_surb_time"], MESSAGE_PER_TRIAL))
+            logging.info('[RECEIVER] Sending SURBs back')
+            received_messages = [json.loads(msg)['replySurb']
+                                 for msg in received_messages]
+            surb_replies = [json.dumps({
+                    'type': "reply",
+                            'message': str(count),
+                            'replySurb': reply_surb
+                }) for reply_surb in received_messages]
+            
+            start = time.time()
+            
+            for reply_surb in surb_replies:
+                await websocket.send(reply_surb)
+            end = time.time()
+            
+            logging.info('[RECEIVER] Receiver has sent {} SURB reply messages'.format(
+                len(received_messages)))
+            throughput_data["sent_surb_time"] = end - start
+        else:
+            throughput_data["received_text_without_surb_time"] = end - start
+            logging.info(
+                '[RECEIVER] It took {} seconds to receive {} messages *without* SURB'.format(throughput_data["received_text_without_surb_time"], MESSAGE_PER_TRIAL))
 
 
 if TEST_TYPE == 'latency':
