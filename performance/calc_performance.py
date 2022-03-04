@@ -15,6 +15,7 @@ import json
 import sys
 import logging
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
@@ -63,6 +64,14 @@ def calculate_throughput(data, tag, message_num):
         return float(message_num) / float(data[tag])
 
 
+def calculate_loss(real_data, expected_data):
+    return round((float(real_data) / float(expected_data)) * 100, 1)
+
+
+def percentage(part, whole):
+    return 100 * float(part)/float(whole)
+
+
 if TEST_TYPE == 'latency':
     # fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 
@@ -87,7 +96,7 @@ if TEST_TYPE == 'latency':
         print('surb reply latency {}'.format(surb_reply_latency))
 
         # Uncomment for unfiltered boxplot OR table creation
-        all_y_surb_reply_latency.append(list(surb_reply_latency))
+        # all_y_surb_reply_latency.append(list(surb_reply_latency))
 
         # Uncomment for filtered boxplot, if you would like to filter out the outputs to make the boxplot prettier
         # cutoff = 4
@@ -104,7 +113,7 @@ if TEST_TYPE == 'latency':
             sender_data['sent_text_without_surb_time'], receiver_data['received_text_time'])
 
         # Uncomment for unfiltered boxplot OR table creation
-        all_y_text_latency_without_surb.append(list(text_latency_without_surb))
+        # all_y_text_latency_without_surb.append(list(text_latency_without_surb))
 
         # Uncomment for filtered boxplot, if you would like to filter out the outputs to make the boxplot prettier
         # cutoff = 35
@@ -135,24 +144,26 @@ if TEST_TYPE == 'latency':
         #     text_latency_with_surb)
 
     ##### GRAPHS #####
-    # plt.grid(visible=True, axis='y')
-    # # Modify according to the graph
-    # plt.title("Text message (no SURB attached)")
-    # plt.xlabel('Number of messages')
-    # plt.ylabel('Latency per message (secs)')
-    # plot_name = '/text-with-surb-unfiltered-scatterplot.png'
+    plt.grid(visible=True, axis='y')
+    # Modify according to the graph
+    plt.title("Latency of sending a message (SURB attached)")
+    plt.xlabel('Number of total messages sent')
+    plt.ylabel('Latency per message (secs)')
+    plot_name = '/text-with-surb-unfiltered-boxplot.png'
 
     # Uncomment and modify for boxplot
-    # plt.boxplot(all_y_text_latency_with_surb, labels=sys.argv[3:])
+    plt.boxplot(all_y_text_latency_with_surb, labels=sys.argv[3:])
 
     # Uncomment and modify for scatter plot
-    # best_fit = plot_best_fit(np.array(all_x_text_latency_with_surb),
-    #                          np.array(all_y_text_latency_with_surb))
+    # best_fit = plot_best_fit(np.array(all_x_text_latency_without_surb),
+    #                          np.array(all_y_text_latency_without_surb))
     # plt.xticks(ticks=[0, 1, 2], labels=sys.argv[3:])
     # avg_best_fit = round(np.average(best_fit), 2)
     # plt.text(-0.28, avg_best_fit, avg_best_fit, color='purple', va='center')
+    # purple_patch = mpatches.Patch(color='purple', label='best fit line')
+    # loss_legend = plt.legend(loc='upper left', handles=[purple_patch])
 
-    # plt.savefig(LOG_PATH + plot_name)
+    plt.savefig(LOG_PATH + plot_name)
 
     ##### TABLES #####
     # Table structure is:
@@ -161,64 +172,63 @@ if TEST_TYPE == 'latency':
     # <msg type>_<msg num>
     #          ...
 
-    def percentage(part, whole):
-        return 100 * float(part)/float(whole)
-
-    table = dict()
-    table['Average'] = list()
-    table['StdDev'] = list()
-    table['Min'] = list()
-    table['Max'] = list()
-    table['Loss'] = list()
-    table['Average'].extend(np.average(latency)
-                            for latency in all_y_surb_reply_latency)
-    table['Average'].extend(np.average(latency)
-                            for latency in all_y_text_latency_with_surb)
-    table['Average'].extend(np.average(latency)
-                            for latency in all_y_text_latency_without_surb)
-    table['StdDev'].extend(np.std(latency)
-                           for latency in all_y_surb_reply_latency)
-    table['StdDev'].extend(np.std(latency)
-                           for latency in all_y_text_latency_with_surb)
-    table['StdDev'].extend(np.std(latency)
-                           for latency in all_y_text_latency_without_surb)
-    table['Min'].extend(np.min(latency)
-                        for latency in all_y_surb_reply_latency)
-    table['Min'].extend(np.min(latency)
-                        for latency in all_y_text_latency_with_surb)
-    table['Min'].extend(np.min(latency)
-                        for latency in all_y_text_latency_without_surb)
-    table['Max'].extend(np.min(latency)
-                        for latency in all_y_surb_reply_latency)
-    table['Max'].extend(np.min(latency)
-                        for latency in all_y_text_latency_with_surb)
-    table['Max'].extend(np.min(latency)
-                        for latency in all_y_text_latency_without_surb)
-    table['Loss'].extend(percentage(len(all_y_surb_reply_latency[i]),
-                                    sys.argv[3 + i])for i in range(len(all_y_surb_reply_latency)))
-    table['Loss'].extend(percentage(len(all_y_text_latency_with_surb[i]),
-                                    sys.argv[3 + i])for i in range(len(all_y_text_latency_with_surb)))
-    table['Loss'].extend(percentage(len(all_y_text_latency_without_surb[i]),
-                                    sys.argv[3 + i])for i in range(len(all_y_text_latency_without_surb)))
-    df = pd.DataFrame(table, index=['SURB_100', 'SURB_1000', 'SURB_10000', 'Text_With_SURB_100', 'Text_With_SURB_1000',
-                                    'Text_With_SURB_10000', 'Text_Without_SURB_100', 'Text_Without_SURB_1000', 'Text_Without_SURB_10000'])
-    df.to_csv(LOG_PATH + '/table.csv')
+    # table = dict()
+    # table['Average'] = list()
+    # table['StdDev'] = list()
+    # table['Min'] = list()
+    # table['Max'] = list()
+    # table['Loss'] = list()
+    # table['Average'].extend(np.average(latency)
+    #                         for latency in all_y_surb_reply_latency)
+    # table['Average'].extend(np.average(latency)
+    #                         for latency in all_y_text_latency_with_surb)
+    # table['Average'].extend(np.average(latency)
+    #                         for latency in all_y_text_latency_without_surb)
+    # table['StdDev'].extend(np.std(latency)
+    #                        for latency in all_y_surb_reply_latency)
+    # table['StdDev'].extend(np.std(latency)
+    #                        for latency in all_y_text_latency_with_surb)
+    # table['StdDev'].extend(np.std(latency)
+    #                        for latency in all_y_text_latency_without_surb)
+    # table['Min'].extend(np.min(latency)
+    #                     for latency in all_y_surb_reply_latency)
+    # table['Min'].extend(np.min(latency)
+    #                     for latency in all_y_text_latency_with_surb)
+    # table['Min'].extend(np.min(latency)
+    #                     for latency in all_y_text_latency_without_surb)
+    # table['Max'].extend(np.max(latency)
+    #                     for latency in all_y_surb_reply_latency)
+    # table['Max'].extend(np.max(latency)
+    #                     for latency in all_y_text_latency_with_surb)
+    # table['Max'].extend(np.max(latency)
+    #                     for latency in all_y_text_latency_without_surb)
+    # table['Loss'].extend(percentage(len(all_y_surb_reply_latency[i]),
+    #                                 sys.argv[3 + i])for i in range(len(all_y_surb_reply_latency)))
+    # table['Loss'].extend(percentage(len(all_y_text_latency_with_surb[i]),
+    #                                 sys.argv[3 + i])for i in range(len(all_y_text_latency_with_surb)))
+    # table['Loss'].extend(percentage(len(all_y_text_latency_without_surb[i]),
+    #                                 sys.argv[3 + i])for i in range(len(all_y_text_latency_without_surb)))
+    # df = pd.DataFrame(table, index=['SURB_100', 'SURB_1000', 'SURB_10000', 'Text_With_SURB_100', 'Text_With_SURB_1000',
+    #                                 'Text_With_SURB_10000', 'Text_Without_SURB_100', 'Text_Without_SURB_1000', 'Text_Without_SURB_10000'])
+    # df.to_csv(LOG_PATH + '/table.csv')
 
 # Throughput
 else:
-    sent_text_with_surb_time_y = []
-    sent_text_with_surb_time_x = []
-    sent_text_without_surb_time_y = []
-    sent_text_without_surb_time_x = []
-    received_surb_reply_time_y = []
-    received_surb_reply_time_x = []
+    sent_text_with_surb_throughput_y = []
+    sent_text_with_surb_throughput_x = []
+    sent_text_without_surb_throughput_y = []
+    sent_text_without_surb_throughput_x = []
+    received_surb_reply_throughput_y = []
+    received_surb_reply_throughput_x = []
 
-    received_surb_text_time_y = []
-    received_surb_text_time_x = []
-    received_text_time_y = []
-    received_text_time_x = []
-    sent_surb_reply_time_y = []
-    sent_surb_reply_time_x = []
+    received_surb_text_throughput_y = []
+    received_surb_text_throughput_x = []
+    received_text_throughput_y = []
+    received_text_throughput_x = []
+    sent_surb_reply_throughput_y = []
+    sent_surb_reply_throughput_x = []
+
+    received_surb_loss = []
 
     logging.info("[PERFORMANCE_CALC] Throughput data:")
     for message_num in sys.argv[4:]:
@@ -236,35 +246,44 @@ else:
         with open(WITHOUT_SURB_LOG_PATH + '/' + message_num + '/receiver.json', 'r') as file:
             receiver_data.update(json.load(file))
 
-        sent_text_with_surb_time_y.append(calculate_throughput(
+        sent_text_with_surb_throughput_y.append(calculate_throughput(
             sender_data, 'sent_text_with_surb_time', message_num))
-        sent_text_with_surb_time_x.append(int(message_num))
+        sent_text_with_surb_throughput_x.append(int(message_num))
 
-        sent_text_without_surb_time_y.append(calculate_throughput(
+        sent_text_without_surb_throughput_y.append(calculate_throughput(
             sender_data, 'sent_text_without_surb_time', message_num))
-        sent_text_without_surb_time_x.append(int(message_num))
+        sent_text_without_surb_throughput_x.append(int(message_num))
 
-        received_surb_text_time_y.append(calculate_throughput(
+        received_surb_text_throughput_y.append(calculate_throughput(
             receiver_data, 'received_text_with_surb_time', message_num))
-        received_surb_text_time_x.append(int(message_num))
+        received_surb_text_throughput_x.append(int(message_num))
 
-        received_text_time_y.append(calculate_throughput(
+        received_text_throughput_y.append(calculate_throughput(
             receiver_data, 'received_text_without_surb_time', message_num))
-        received_text_time_x.append(int(message_num))
+        received_text_throughput_x.append(int(message_num))
 
-        sent_surb_reply_time_y.append(calculate_throughput(
+        sent_surb_reply_throughput_y.append(calculate_throughput(
             receiver_data, 'sent_surb_time', message_num))
-        sent_surb_reply_time_x.append(int(message_num))
+        sent_surb_reply_throughput_x.append(int(message_num))
 
-        received_surb_reply_time_y.append(calculate_throughput(
-            sender_data, 'received_surb_time', sender_data['received_surb_time'][0]))
-        received_surb_reply_time_x.append(sender_data['received_surb_time'][0])
+        # received_surb_reply_throughput_y.append(calculate_throughput(
+        #     sender_data, 'received_surb_time', sender_data['received_surb_time'][0]))
+        # received_surb_reply_throughput_x.append(sender_data['received_surb_time'][0])
 
-    plt.plot(sent_text_with_surb_time_x, sent_text_with_surb_time_y,
+        received_surb_reply_throughput_y.append(calculate_throughput(
+            sender_data, 'received_surb_time', message_num))
+        received_surb_reply_throughput_x.append(int(message_num))
+
+        received_surb_loss.append(calculate_loss(
+            sender_data['received_surb_time'][0], message_num))
+
+    # Sent messages plot
+    fig, ax = plt.subplots(figsize=(15, 8))
+    plt.plot(sent_text_with_surb_throughput_x, sent_text_with_surb_throughput_y,
              label='text message (SURB attached)')
-    plt.plot(sent_text_without_surb_time_x, sent_text_without_surb_time_y,
+    plt.plot(sent_text_without_surb_throughput_x, sent_text_without_surb_throughput_y,
              label='text message (no SURB attached)')
-    plt.plot(sent_surb_reply_time_x, sent_surb_reply_time_y,
+    plt.plot(sent_surb_reply_throughput_x, sent_surb_reply_throughput_y,
              label='reply message using SURB')
     plt.legend()
     plt.grid(visible=True, axis='y')
@@ -279,18 +298,87 @@ else:
 
     plt.clf()
 
+    # Received messages plot
+    fig, ax = plt.subplots(figsize=(15, 8))
+    ax.set_ylim(0, 10)
     plt.title('Throughput: Receiving messages')
-    plt.plot(received_surb_text_time_x, received_surb_text_time_y,
-             label='text message (SURB attached)')
-    plt.plot(received_text_time_x, received_text_time_y,
-             label='text message (no SURB attached)')
-    plt.plot(received_surb_reply_time_x, received_surb_reply_time_y,
-             label='reply message using SURB')
-    plt.legend()
-    plt.grid(visible=True, axis='y')
+    l1 = plt.plot(received_surb_text_throughput_x, received_surb_text_throughput_y,
+                  label='text message (SURB attached)')
+    l2 = plt.plot(received_text_throughput_x, received_text_throughput_y,
+                  label='text message (no SURB attached)')
+    l3 = plt.plot(received_surb_reply_throughput_x, received_surb_reply_throughput_y,
+                  label='reply message using SURB')
+    yellow_patch = mpatches.Patch(color='yellow', label='% received SURB replies')
+    loss_legend = plt.legend(loc=(0.803, 0.13), handles=[yellow_patch])
+    plt.legend(loc='lower right')
+    plt.gca().add_artist(loss_legend)
+    plt.grid(visible=True)
     plt.title('Throughput: Receiving messages')
     plt.xlabel('Number of messages')
     plt.ylabel('Throughput (msg/sec)')
     plt.xticks([100, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500,
                 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000], rotation=90)
+
+    # Draw boxes for received SURB message percentages
+    for label, x, y in zip(received_surb_loss, received_surb_reply_throughput_x, received_surb_reply_throughput_y):
+        plt.annotate(
+            label,
+            xy=(x, y), xytext=(x, 9.8),
+            textcoords='data', ha='center', va='top',
+            bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),)
     plt.savefig(TEST_TYPE + '_logs/' + sys.argv[1] + '/received_text_plot.png')
+
+    plt.clf()
+
+    # Message Loss Plot
+    fig, ax = plt.subplots(figsize=(15, 8))
+    ax.set_ylim(60, 70)
+    plt.plot(received_surb_reply_throughput_x, [
+             100.0 - x for x in received_surb_loss])
+    plt.grid(visible=True, axis='y')
+    plt.title('Percentage of Message Loss on Receiving SURB Replies')
+    plt.xlabel('Percentage')
+    plt.ylabel('Number of SURB replies sent by the sender')
+    plt.xticks([100, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500,
+                5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000], rotation=90)
+    plt.savefig(TEST_TYPE + '_logs/' +
+                sys.argv[1] + '/surb_reply_loss_plot.png')
+
+    # Throughput statistics table
+    table = dict()
+    table['Average'] = list()
+    table['StdDev'] = list()
+    table['Min'] = list()
+    table['Max'] = list()
+    table['Loss'] = list()
+    print(sent_surb_reply_throughput_y)
+    table['Average'].append(np.average(sent_surb_reply_throughput_y))
+    table['Average'].append(np.average(sent_text_with_surb_throughput_y))
+    table['Average'].append(np.average(sent_text_without_surb_throughput_y))
+    table['StdDev'].append(np.std(sent_surb_reply_throughput_y))
+    table['StdDev'].append(np.std(sent_text_with_surb_throughput_y))
+    table['StdDev'].append(np.std(sent_text_without_surb_throughput_y))
+    table['Min'].append(np.min(sent_surb_reply_throughput_y))
+    table['Min'].append(np.min(sent_text_with_surb_throughput_y))
+    table['Min'].append(np.min(sent_text_without_surb_throughput_y))
+    table['Max'].append(np.max(sent_surb_reply_throughput_y))
+    table['Max'].append(np.max(sent_text_with_surb_throughput_y))
+    table['Max'].append(np.max(sent_text_without_surb_throughput_y))
+    table['Average'].append(np.average(received_surb_reply_throughput_y))
+    table['Average'].append(np.average(received_surb_text_throughput_y))
+    table['Average'].append(np.average(received_text_throughput_y))
+    table['StdDev'].append(np.std(received_surb_reply_throughput_y))
+    table['StdDev'].append(np.std(received_surb_text_throughput_y))
+    table['StdDev'].append(np.std(received_text_throughput_y))
+    table['Min'].append(np.min(received_surb_reply_throughput_y))
+    table['Min'].append(np.min(received_surb_text_throughput_y))
+    table['Min'].append(np.min(received_text_throughput_y))
+    table['Max'].append(np.max(received_surb_reply_throughput_y))
+    table['Max'].append(np.max(received_surb_text_throughput_y))
+    table['Max'].append(np.max(received_text_throughput_y))
+
+    table['Loss'].extend([0, 0, 0, np.average(received_surb_loss), 0, 0])
+
+    df = pd.DataFrame(table, index=['Sent_SURB_Reply', 'Sent_Text_With_SURB', 'Sent_Text_Without_SURB',
+                                    'Received_SURB_Reply', 'Received_Text_With_SURB', 'Received_Text_Without_SURB'])
+    df.to_csv(TEST_TYPE + '_logs/' + sys.argv[1] + '/table.csv')

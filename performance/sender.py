@@ -198,28 +198,38 @@ async def load_text():
             # It does not receive any more SURBs. For that reason, I stop waiting after a few timeouts.
             timeout_cnt = 0
             received_surb_indexes = list()
-            while count < MESSAGE_PER_TRIAL and timeout_cnt < 5:
+
+            # Uncomment for checking the receival pattern of SURB replies
+            surb_reply_arrivals = list()
+
+            while count < MESSAGE_PER_TRIAL: \
+                    # and timeout_cnt < 5: # Comment out for checking the receival pattern of SURB replies
                 if count == 0:
                     received_message = json.loads(await websocket.recv())
                     received_surb_indexes.append(
                         (received_message['message'], time.time()))
+                    print('received the first SURB')
                     end = time.time()
                 else:
                     try:
                         received_message = json.loads(await asyncio.wait_for(websocket.recv(), timeout=10))
+                        end = time.time()
+                        received_message_cnt += 1
+
+                        # Uncomment for checking the receival pattern of SURB replies
                         received_surb_indexes.append(
                             (received_message['message'], time.time()))
-                        received_message_cnt += 1
-                        end = time.time()
+
                     except asyncio.TimeoutError:
                         logging.info(
-                            '[SENDER] Timeout while waitng for SURB messages')
+                            '[SENDER] Timeout while waiting for SURB messages')
                         timeout_cnt += 1
                 count += 1
             throughput_data["received_surb_time"] = (
                 received_message_cnt, end - start)
             logging.info(
                 '[SENDER] Received {} SURB replies in {} seconds'.format(received_message_cnt, end - start))
+            throughput_data['surb_receival_pattern'] = received_surb_indexes
         else:
             throughput_data["sent_text_without_surb_time"] = end - start
             logging.info(

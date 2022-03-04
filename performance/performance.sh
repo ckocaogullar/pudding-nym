@@ -160,129 +160,129 @@ wait
 
 # Throughput: No SURB
 
-echo 1st Run Without SURB:
-python3 receiver.py "$NOW" throughput 100 --surb FALSE &
-python3 sender.py "$NOW" throughput 100 --surb FALSE &
+# echo 1st Run Without SURB:
+# python3 receiver.py "$NOW" throughput 100 --surb FALSE &
+# python3 sender.py "$NOW" throughput 100 --surb FALSE &
 
-wait
+# wait
 
-echo 2nd Run Without SURB:
-python3 receiver.py "$NOW" throughput 500 --surb FALSE &
-python3 sender.py "$NOW" throughput 500 --surb FALSE &
+# echo 2nd Run Without SURB:
+# python3 receiver.py "$NOW" throughput 500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 500 --surb FALSE &
 
-wait
+# wait
 
-echo 3rd Run Without SURB:
-python3 receiver.py "$NOW" throughput 1000 --surb FALSE &
-python3 sender.py "$NOW" throughput 1000 --surb FALSE &
+# echo 3rd Run Without SURB:
+# python3 receiver.py "$NOW" throughput 1000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 1000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 4th Run Without SURB:
-python3 receiver.py "$NOW" throughput 1500 --surb FALSE &
-python3 sender.py "$NOW" throughput 1500 --surb FALSE &
+# echo 4th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 1500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 1500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 5th Run Without SURB:
-python3 receiver.py "$NOW" throughput 2000 --surb FALSE &
-python3 sender.py "$NOW" throughput 2000 --surb FALSE &
+# echo 5th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 2000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 2000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 6th Run Without SURB:
-python3 receiver.py "$NOW" throughput 2500 --surb FALSE &
-python3 sender.py "$NOW" throughput 2500 --surb FALSE &
+# echo 6th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 2500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 2500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 7th Run Without SURB:
-python3 receiver.py "$NOW" throughput 3000 --surb FALSE &
-python3 sender.py "$NOW" throughput 3000 --surb FALSE &
+# echo 7th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 3000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 3000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 8th Run Without SURB:
-python3 receiver.py "$NOW" throughput 3500 --surb FALSE &
-python3 sender.py "$NOW" throughput 3500 --surb FALSE &
+# echo 8th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 3500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 3500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 9th Run Without SURB:
-python3 receiver.py "$NOW" throughput 4000 --surb FALSE &
-python3 sender.py "$NOW" throughput 4000 --surb FALSE &
+# echo 9th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 4000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 4000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 10th Run Without SURB:
-python3 receiver.py "$NOW" throughput 4500 --surb FALSE &
-python3 sender.py "$NOW" throughput 4500 --surb FALSE &
+# echo 10th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 4500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 4500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 11th Run Without SURB:
-python3 receiver.py "$NOW" throughput 5000 --surb FALSE &
-python3 sender.py "$NOW" throughput 5000 --surb FALSE &
+# echo 11th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 5000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 5000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 12th Run Without SURB:
-python3 receiver.py "$NOW" throughput 5500 --surb FALSE &
-python3 sender.py "$NOW" throughput 5500 --surb FALSE &
+# echo 12th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 5500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 5500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 13th Run Without SURB:
-python3 receiver.py "$NOW" throughput 6000 --surb FALSE &
-python3 sender.py "$NOW" throughput 6000 --surb FALSE &
+# echo 13th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 6000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 6000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 14th Run Without SURB:
-python3 receiver.py "$NOW" throughput 6500 --surb FALSE &
-python3 sender.py "$NOW" throughput 6500 --surb FALSE &
+# echo 14th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 6500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 6500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 15th Run Without SURB:
-python3 receiver.py "$NOW" throughput 7000 --surb FALSE &
-python3 sender.py "$NOW" throughput 7000 --surb FALSE &
+# echo 15th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 7000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 7000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 16th Run Without SURB:
-python3 receiver.py "$NOW" throughput 7500 --surb FALSE &
-python3 sender.py "$NOW" throughput 7500 --surb FALSE &
+# echo 16th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 7500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 7500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 17th Run Without SURB:
-python3 receiver.py "$NOW" throughput 8000 --surb FALSE &
-python3 sender.py "$NOW" throughput 8000 --surb FALSE &
+# echo 17th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 8000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 8000 --surb FALSE &
 
-wait 
+# wait 
 
-echo 18th Run Without SURB:
-python3 receiver.py "$NOW" throughput 8500 --surb FALSE &
-python3 sender.py "$NOW" throughput 8500 --surb FALSE &
+# echo 18th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 8500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 8500 --surb FALSE &
 
-wait 
+# wait 
 
-echo 19th Run Without SURB:
-python3 receiver.py "$NOW" throughput 9000 --surb FALSE &
-python3 sender.py "$NOW" throughput 9000 --surb FALSE &
+# echo 19th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 9000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 9000 --surb FALSE &
 
-wait
+# wait
 
-echo 20th Run Without SURB:
-python3 receiver.py "$NOW" throughput 9500 --surb FALSE &
-python3 sender.py "$NOW" throughput 9500 --surb FALSE &
+# echo 20th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 9500 --surb FALSE &
+# python3 sender.py "$NOW" throughput 9500 --surb FALSE &
 
-wait
+# wait
 
-echo 21th Run Without SURB:
-python3 receiver.py "$NOW" throughput 10000 --surb FALSE &
-python3 sender.py "$NOW" throughput 10000 --surb FALSE &
+# echo 21th Run Without SURB:
+# python3 receiver.py "$NOW" throughput 10000 --surb FALSE &
+# python3 sender.py "$NOW" throughput 10000 --surb FALSE &
 
-wait
+# wait
 
