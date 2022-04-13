@@ -19,7 +19,7 @@ async def send_text_with_surb():
         text_send = json.dumps({
             "type": "send",
             "message": message,
-            "recipient": "DJr5NiZaEa6b1sWT4MRTFEyqkbHxcfQwmgpXuERC8wru.9yHrjyWH6etTjSGMTtwY5CFMKaeGija8nc8nfMjC4Fq3@83x9YyNkQ5QEY84ZU6Wmq8XHqfwf9SUtR7g5PAYB1FRY",
+            "recipient": "HTgnSgopF9UDimUR9KDuqJKMPrAsDEvQoxuzEkJsuw5i.GszykGMXfpEy7hmWhU77JT3yxcbyQ1barRbn5V3xFLiy@CbxxDmmNCufXSsi7hqUnorchtsqqSLSZp7QfRJ5ugSRA",
             "withReplySurb": True,
         })
         print("....")
@@ -27,11 +27,11 @@ async def send_text_with_surb():
         print("....")
         print("Sending '{}' (*with* reply SURB) over the mix network...".format(message))
         await websocket.send(text_send)
-
-        print("Waiting to receive a message from the mix network...")
-        received_message = json.loads(await websocket.recv())
-        print("Received '{}' from the mix network".format(
-            received_message["message"]))
+        for i in range(2):
+            print("Waiting to receive a message from the mix network...")
+            received_message = json.loads(await websocket.recv())
+            print("Received '{}' from the mix network".format(
+                received_message["message"]))
 
 
 async def ping_wait():
