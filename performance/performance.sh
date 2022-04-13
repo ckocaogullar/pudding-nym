@@ -6,14 +6,43 @@ NOW=$( date '+%F_%H:%M:%S' )
 # echo ---- LATENCY TESTS ----
 # echo
 
-# echo First Run:
-python3 receiver.py "$NOW" latency 100 &
-python3 sender.py "$NOW" latency 100 --surb FALSE & 
+echo ---- LATENCY TESTS ----
+python3 receiver.py latency "$NOW" 10 &
+python3 sender.py latency "$NOW" 10 --surb FALSE & 
 
+wait 
 
-python3 receiver.py "$NOW" surb_prep 10000 &
-python3 receiver.py "$NOW" latency 100 &
-python3 sender.py "$NOW" latency 100 --surb TRUE & 
+python3 receiver.py surb_prep 100 
+
+wait
+
+python3 receiver.py latency "$NOW" 10 &
+python3 sender.py latency "$NOW" 10 --surb TRUE & 
+
+wait 
+
+echo ---- THROUGHPUT TESTS ----
+python3 receiver.py throughput "$NOW" 10 &
+python3 sender.py throughput "$NOW" 10 --surb FALSE & 
+
+wait 
+
+python3 receiver.py surb_prep 1110
+
+wait
+
+python3 receiver.py throughput "$NOW" 10 &
+python3 sender.py throughput "$NOW" 10 --surb TRUE & 
+
+wait
+
+python3 receiver.py throughput "$NOW" 100 &
+python3 sender.py throughput "$NOW" 100 --surb TRUE & 
+
+wait
+
+python3 receiver.py throughput "$NOW" 1000 &
+python3 sender.py throughput "$NOW" 1000 --surb TRUE & 
 
 # wait
 

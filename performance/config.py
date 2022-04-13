@@ -15,4 +15,4 @@ RECEIVER_CLIENT_URI = "ws://localhost:1978"
 # Latency params
 INIT_FREQ = 0.1
 FREQ_STEP = 0.1
-MAX_FREQ = 10
+MAX_FREQ = 1
