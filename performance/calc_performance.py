@@ -18,21 +18,21 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
+import os
+
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 # Check and save system argument
 assert len(
     sys.argv) >= 2, "Performance calculator must take at least two parameter: name of the log file(s), and the number(s) of messages for each trial"
-assert sys.argv[3] == 'throughput' or sys.argv[2] == 'latency', "Test type must be 'throughput' or 'latency'"
+assert sys.argv[2] == 'throughput' or sys.argv[2] == 'latency', "Test type must be 'throughput' or 'latency'"
 
 # Set constants
-TEST_TYPE = sys.argv[2] if sys.argv[2] == 'latency' else sys.argv[3]
+TEST_TYPE = sys.argv[2]
 LOG_PATH = TEST_TYPE + '_logs/' + \
-    sys.argv[1] if TEST_TYPE == 'latency' else None
-WITH_SURB_LOG_PATH = TEST_TYPE + '_logs/' + \
-    sys.argv[1] + '/with_surb/' if TEST_TYPE == 'throughput' else None
-WITHOUT_SURB_LOG_PATH = TEST_TYPE + '_logs/' + \
-    sys.argv[2] + '/without_surb/' if TEST_TYPE == 'throughput' else None
+    sys.argv[2] if TEST_TYPE == 'latency' else None
+WITH_SURB_LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] +'/with_surb'
+WITHOUT_SURB_LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] +'/without_surb'
 
 
 def calculate_latency(start_dict, end_dict):
@@ -72,16 +72,192 @@ def percentage(part, whole):
     return 100 * float(part)/float(whole)
 
 
-def prep_data_for_scatterplot(cumulative_x_data, cumulative_y_data, local_data, filter=None):
-    cumulative_y_data += list(local_data)
-    cumulative_x_data += plot_latency(local_data)
+# def prep_data_for_scatterplot(cumulative_x_data, cumulative_y_data, local_data, filter=None):
+#     cumulative_y_data += list(local_data)
+#     cumulative_x_data += plot_latency(local_data)
+
+def prep_data_for_linegraph(dict):
+    x_data = list()
+    y_data = list()
+
+    for freq in dict:
+        x_data.append(float(freq))
+        y_data.append(np.average(dict[freq]))
+    
+    return x_data, y_data
+
+
+def prep_data_for_scatterplot(dict):
+    x_data = list()
+    y_data = list()
+    for freq in dict:
+        for l in dict[freq]:
+            x_data.append(float(freq))
+            y_data.append(l)
+    return x_data, y_data
 
 
 def prep_data_for_boxlot_or_table(cumulative_y_data, local_data):
     cumulative_y_data.append(list(local_data))
 
 
+def prep_data_for_throughput(path):
+    sender_data_x = list()
+    sender_data_y = list()
+    receiver_data_x = list()
+    receiver_data_y = list()
+
+    message_nums = os.listdir(WITH_SURB_LOG_PATH)
+    for message_num in message_nums:
+        try:
+            message_num = int(message_num)
+            sender_data_x.append(int(message_num))
+            receiver_data_x.append(int(message_num))
+            with open(path + '/' + str(message_num) + '/sender.json', 'r') as file:
+                data = json.load(file)
+                sender_data_y.append(data['sent_time'] / len(data['message_timings']))
+
+            with open(path + '/' + str(message_num) + '/receiver.json', 'r') as file:
+                data = json.load(file)
+                receiver_data_y.append(data['received_time'] / len(data['message_timings']))
+        except Exception as e:
+            print(e)
+
+    return [sender_data_x, sender_data_y], [receiver_data_x, receiver_data_y]
+
+def prep_data_for_latency(path):
+    latency_data = dict()
+    missed_packets = dict()
+    with open(path + '/sender.json', 'r') as file:
+        sender_data = json.load(file)
+
+    with open(path + '/receiver.json', 'r') as file:
+        receiver_data = json.load(file)
+
+    for freq in sender_data['sent_text_time']:
+        if freq != '1.0':
+            for message_seq in sender_data['sent_text_time'][freq]:
+                try:
+                    if freq not in latency_data:
+                        latency_data[freq] = list()
+                    latency = receiver_data['received_text_time'][freq][message_seq] - \
+                        sender_data['sent_text_time'][freq][message_seq]
+                    latency_data[freq].append(latency)
+                except:
+                    print('Message no {}, freq {} was lost on its way to receiver'.format(message_seq, freq))
+                    missed_packets[freq].append(message_seq)
+                    # latency_data[freq].append(-1)
+    return latency_data
+
+
 if TEST_TYPE == 'latency':
+    # with_surb_latency_data = prep_data_for_latency(WITH_SURB_LOG_PATH)
+    without_surb_latency_data = prep_data_for_latency(WITHOUT_SURB_LOG_PATH)
+    plt.grid(visible=True, axis='y')
+
+    ###  SCATTER PLOT ###
+
+    # # With SURB
+    # x_data, y_data = prep_data_for_scatterplot(with_surb_latency_data)
+
+    # plt.title("Latency of sending a non-SURB message")
+    # plt.xlabel('Message frequency (message/sec)')
+    # plt.ylabel('Latency per message (sec)')
+    
+    # plt.scatter(x_data, y_data)
+
+    # plt.savefig(WITH_SURB_LOG_PATH + '/scatterplot.png')
+
+    # plt.clf()
+
+    # Without SURB
+    x_data, y_data = prep_data_for_scatterplot(without_surb_latency_data)
+
+
+    plt.title("Latency of sending a SURB reply")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Latency per message (sec)')
+
+    plt.scatter(x_data, y_data)
+
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/scatterplot.png')
+
+    plt.clf()
+
+
+    ###  LINE GRAPH ###
+
+    # # With SURB
+    # x_data, y_data = prep_data_for_linegraph(with_surb_latency_data)
+
+    # plt.title("Average latency of sending a non-SURB message")
+    # plt.xlabel('Message frequency (message/sec)')
+    # plt.ylabel('Average latency per message (secs)')
+    
+    # plt.plot(x_data, y_data)
+
+    # plt.savefig(WITH_SURB_LOG_PATH + '/linegraph.png')
+
+    # plt.clf()
+
+    # Without SURB
+    x_data, y_data = prep_data_for_linegraph(without_surb_latency_data)
+
+    plt.title("Average latency of sending a SURB reply")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Average latency per message (secs)')
+
+    plt.plot(x_data, y_data)
+
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/linegraph.png')
+
+
+
+elif TEST_TYPE == 'throughput':
+    #  With SURB
+    sender_data, receiver_data = prep_data_for_throughput(WITH_SURB_LOG_PATH)
+    print(sender_data)
+
+    plt.title("Throughput of sending SURB replies")
+    plt.xlabel('Number of total messages sent')
+    plt.ylabel('Throughput (msg/sec)')
+    plt.plot(sender_data[0], sender_data[1])
+
+    plt.savefig(WITH_SURB_LOG_PATH + '/sender-linegraph.png')
+
+    plt.clf()
+
+    # plt.title("Throughput of receiving SURB replies")
+    # plt.xlabel('Number of total messages sent')
+    # plt.ylabel('Throughput (msg/sec)')
+    # plt.plot(receiver_data[0], receiver_data[1])
+
+    # plt.savefig(WITH_SURB_LOG_PATH + '/receiver-linegraph.png')
+
+    # plt.clf()
+
+    #  Without SURB
+    sender_data, receiver_data = prep_data_for_throughput(WITHOUT_SURB_LOG_PATH)
+    print(sender_data)
+    # Modify according to the graph
+    plt.title("Throughput of sending non-SURB messages")
+    plt.xlabel('Number of total messages sent')
+    plt.ylabel('Throughput (msg/sec)')
+    plt.plot(sender_data[0], sender_data[1])
+
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/sender-linegraph.png')
+
+    plt.clf()
+
+    plt.title("Throughput of receiving non-SURB messages")
+    plt.xlabel('Number of total messages sent')
+    plt.ylabel('Throughput (msg/sec)')
+    plt.plot(receiver_data[0], receiver_data[1])
+
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/receiver-linegraph.png')
+
+
+elif TEST_TYPE == 'x':
     # fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 
     # To draw the best fit lines for each graph, we need to accumulate the data from different runs. (Not a pretty or smart way, but OK for now)

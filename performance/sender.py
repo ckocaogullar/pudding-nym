@@ -44,11 +44,12 @@ else:
 LOG_PATH = TEST_TYPE + '_logs/' + \
     sys.argv[2] + '/' + surb_folder
 
+if TEST_TYPE == 'throughput':
+    LOG_PATH += str(MESSAGE_PER_TRIAL)
+
 # For storing the test results on the run
 latency_data = {
-    "sent_text_with_surb_time": dict(),
-    "sent_text_without_surb_time": dict(),
-    "received_surb_reply_text_time": dict(),
+    "sent_text_time": dict(),
 }
 
 throughput_data = dict()
@@ -65,6 +66,9 @@ def save_to_file(data):
     if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[2]):
         os.mkdir(TEST_TYPE + '_logs/' + sys.argv[2])
 
+    if TEST_TYPE == 'throughput' and not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[2] + '/' + surb_folder):
+        os.mkdir(TEST_TYPE + '_logs/' + sys.argv[2] + '/' + surb_folder)
+
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
 
@@ -78,12 +82,20 @@ async def latency_test(surb_run):
     count = 0
     freq = config.INIT_FREQ
     reply_surbs = list()
+    duplicates = list()
     messages = list()
-    if surb_run:
-        with open('prepared_surbs/surb.json', 'r') as f:
-            reply_surbs = json.load(f)['surbs']
+    label = "sent_text_time"
+    print(config.RECEIVER_ADDRESS)
 
-        label = "sent_text_with_surb_time"
+    # If test is to be done with SURBs
+    if surb_run:
+        # Read SURBs from file
+        with open('prepared_surbs/surb.json', 'r') as f:
+            surb_dict = json.load(f)
+            reply_surbs = surb_dict['surbs']
+            duplicates = surb_dict['duplicates']
+
+        # label = "sent_text_with_surb_time"
 
         while freq <= config.MAX_FREQ:
             for i in range(MESSAGE_PER_TRIAL):
@@ -93,15 +105,19 @@ async def latency_test(surb_run):
                     'replySurb': reply_surbs.pop()
                 }
                 )
+            latency_data[label][freq] = dict()
             freq = round(freq + config.FREQ_STEP, 1)
 
+        # Save unused SURBs back to the file
         with open('prepared_surbs/surb.json', 'w') as f:
-            surb_dict = {'surbs': reply_surbs}
+            surb_dict = {'surbs': reply_surbs, 'duplicates': duplicates}
             json.dump(surb_dict, f)
 
         logging.info("[SENDER] **Starting sending messages *with* SURB**")
-
+    
+    # If test is to be done without SURBs
     else:
+        # label = "sent_text_without_surb_time"
         while freq <= config.MAX_FREQ:
             for i in range(MESSAGE_PER_TRIAL):
                 messages.append({
@@ -111,9 +127,9 @@ async def latency_test(surb_run):
                     "withReplySurb": False,
                 }
                 )
+            latency_data[label][freq] = dict()
             freq = round(freq + config.FREQ_STEP, 1)
 
-        label = "sent_text_without_surb_time"
         logging.info("[SENDER] **Starting sending messages *without* SURB**")
 
     freq = config.INIT_FREQ
@@ -126,7 +142,7 @@ async def latency_test(surb_run):
         while freq <= config.MAX_FREQ:
             while count < MESSAGE_PER_TRIAL:
                 await websocket.send(json.dumps(messages.pop(0)))
-                latency_data[label][count] = (time.time())
+                latency_data[label][freq][count] = (time.time())
                 logging.info(
                     "[SENDER] Sent {} message with frequency {}".format(count, freq))
 
@@ -144,14 +160,14 @@ async def load_text():
     start = 0
     end = 0
     messages = list()
+    message_timings = dict()
+    label = "sent_time"
 
     # Prepare the messages you will send
     if TEST_WITH_SURB:
         with open('prepared_surbs/surb.json', 'r') as f:
             reply_surbs = json.load(f)['surbs']
             print(len(reply_surbs))
-
-        label = "sent_text_with_surb_time"
 
         for i in range(MESSAGE_PER_TRIAL + 1):
             messages.append({
@@ -160,6 +176,11 @@ async def load_text():
                 'replySurb': reply_surbs.pop()
             }
             )
+        
+        # Save unused SURBs back to the file
+        with open('prepared_surbs/surb.json', 'w') as f:
+            surb_dict = {'surbs': reply_surbs}
+            json.dump(surb_dict, f)
 
         logging.info("[SENDER] **Starting sending messages *with* SURB**")
 
@@ -173,7 +194,6 @@ async def load_text():
             }
             )
 
-        label = "sent_text_without_surb_time"
         logging.info("[SENDER] **Starting sending messages *without* SURB**")
 
     async with websockets.connect(config.SENDER_CLIENT_URI) as websocket:
@@ -193,15 +213,18 @@ async def load_text():
         #
 
         for i in range(MESSAGE_PER_TRIAL + 1):
-            await websocket.send(json.dumps(messages.pop(0)))
-
+            message = messages.pop(0)
+            await websocket.send(json.dumps(message))
+            message_timings[message['message']] = time.time()
             # Start the timer on the first sent message
             if i == 0:
                 start = time.time()
+                message_timings[message['message']] = time.time()
 
         end = time.time()
 
         throughput_data[label] = end - start
+        throughput_data['message_timings'] = message_timings
         logging.info(
             '[SENDER] It took {} seconds to send {} messages'.format(throughput_data[label], MESSAGE_PER_TRIAL))
 
