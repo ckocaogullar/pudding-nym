@@ -29,10 +29,11 @@ assert sys.argv[2] == 'throughput' or sys.argv[2] == 'latency', "Test type must 
 
 # Set constants
 TEST_TYPE = sys.argv[2]
-LOG_PATH = TEST_TYPE + '_logs/' + \
+print(TEST_TYPE)
+LOG_PATH = 'test' + '_logs/' + \
     sys.argv[2] if TEST_TYPE == 'latency' else None
-WITH_SURB_LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] +'/with_surb'
-WITHOUT_SURB_LOG_PATH = TEST_TYPE + '_logs/' + sys.argv[1] +'/without_surb'
+WITH_SURB_LOG_PATH = 'test' + '_logs/' + sys.argv[1] +'/with_surb'
+WITHOUT_SURB_LOG_PATH = 'test' + '_logs/' + sys.argv[1] +'/without_surb'
 
 
 def calculate_latency(start_dict, end_dict):
@@ -145,30 +146,57 @@ def prep_data_for_latency(path):
                     latency_data[freq].append(latency)
                 except:
                     print('Message no {}, freq {} was lost on its way to receiver'.format(message_seq, freq))
-                    missed_packets[freq].append(message_seq)
+                    try:
+                        missed_packets[freq].append(message_seq)
+                    except:
+                        missed_packets[freq] = list()
+                        missed_packets[freq].append(message_seq)
                     # latency_data[freq].append(-1)
     return latency_data
 
-
 if TEST_TYPE == 'latency':
-    # with_surb_latency_data = prep_data_for_latency(WITH_SURB_LOG_PATH)
+    with_surb_latency_data = prep_data_for_latency(WITH_SURB_LOG_PATH)
+    
     without_surb_latency_data = prep_data_for_latency(WITHOUT_SURB_LOG_PATH)
+    print(without_surb_latency_data)
     plt.grid(visible=True, axis='y')
+
+    ### POISSON ###
+    plt.title("Latency of sending a SURB message")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Latency per message (sec)')
+    for freq in with_surb_latency_data:
+        plt.plot(with_surb_latency_data[freq])
+        break
+
+    plt.savefig(WITH_SURB_LOG_PATH + '/poisson.png')
+
+    plt.clf()
+
+    plt.title("Latency of sending a non-SURB message")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Latency per message (sec)')
+    for freq in with_surb_latency_data:
+        plt.plot(with_surb_latency_data[freq])
+
+    plt.savefig(WITH_SURB_LOG_PATH + '/poisson.png')
+
+    plt.clf()
 
     ###  SCATTER PLOT ###
 
     # # With SURB
-    # x_data, y_data = prep_data_for_scatterplot(with_surb_latency_data)
+    x_data, y_data = prep_data_for_scatterplot(with_surb_latency_data)
 
-    # plt.title("Latency of sending a non-SURB message")
-    # plt.xlabel('Message frequency (message/sec)')
-    # plt.ylabel('Latency per message (sec)')
+    plt.title("Latency of sending a non-SURB message")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Latency per message (sec)')
     
-    # plt.scatter(x_data, y_data)
+    plt.scatter(x_data, y_data)
 
-    # plt.savefig(WITH_SURB_LOG_PATH + '/scatterplot.png')
+    plt.savefig(WITH_SURB_LOG_PATH + '/scatterplot.png')
 
-    # plt.clf()
+    plt.clf()
 
     # Without SURB
     x_data, y_data = prep_data_for_scatterplot(without_surb_latency_data)
@@ -188,21 +216,22 @@ if TEST_TYPE == 'latency':
     ###  LINE GRAPH ###
 
     # # With SURB
-    # x_data, y_data = prep_data_for_linegraph(with_surb_latency_data)
+    x_data, y_data = prep_data_for_linegraph(with_surb_latency_data)
 
-    # plt.title("Average latency of sending a non-SURB message")
-    # plt.xlabel('Message frequency (message/sec)')
-    # plt.ylabel('Average latency per message (secs)')
+    plt.title("Average latency of sending a non-SURB message")
+    plt.xlabel('Message frequency (message/sec)')
+    plt.ylabel('Average latency per message (secs)')
     
-    # plt.plot(x_data, y_data)
+    plt.plot(x_data, y_data)
 
-    # plt.savefig(WITH_SURB_LOG_PATH + '/linegraph.png')
+    plt.savefig(WITH_SURB_LOG_PATH + '/linegraph.png')
 
-    # plt.clf()
+    plt.clf()
 
     # Without SURB
     x_data, y_data = prep_data_for_linegraph(without_surb_latency_data)
-
+    print(x_data)
+    print(y_data)
     plt.title("Average latency of sending a SURB reply")
     plt.xlabel('Message frequency (message/sec)')
     plt.ylabel('Average latency per message (secs)')
@@ -223,16 +252,16 @@ elif TEST_TYPE == 'throughput':
     plt.ylabel('Throughput (msg/sec)')
     plt.plot(sender_data[0], sender_data[1])
 
-    plt.savefig(WITH_SURB_LOG_PATH + '/sender-linegraph.png')
+    plt.savefig(WITH_SURB_LOG_PATH + '/throughput-sender-linegraph.png')
 
     plt.clf()
 
-    # plt.title("Throughput of receiving SURB replies")
-    # plt.xlabel('Number of total messages sent')
-    # plt.ylabel('Throughput (msg/sec)')
-    # plt.plot(receiver_data[0], receiver_data[1])
+    plt.title("Throughput of receiving SURB replies")
+    plt.xlabel('Number of total messages sent')
+    plt.ylabel('Throughput (msg/sec)')
+    plt.plot(receiver_data[0], receiver_data[1])
 
-    # plt.savefig(WITH_SURB_LOG_PATH + '/receiver-linegraph.png')
+    plt.savefig(WITH_SURB_LOG_PATH + '/throughput-receiver-linegraph.png')
 
     # plt.clf()
 
@@ -245,7 +274,7 @@ elif TEST_TYPE == 'throughput':
     plt.ylabel('Throughput (msg/sec)')
     plt.plot(sender_data[0], sender_data[1])
 
-    plt.savefig(WITHOUT_SURB_LOG_PATH + '/sender-linegraph.png')
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/throughput-sender-linegraph.png')
 
     plt.clf()
 
@@ -254,7 +283,7 @@ elif TEST_TYPE == 'throughput':
     plt.ylabel('Throughput (msg/sec)')
     plt.plot(receiver_data[0], receiver_data[1])
 
-    plt.savefig(WITHOUT_SURB_LOG_PATH + '/receiver-linegraph.png')
+    plt.savefig(WITHOUT_SURB_LOG_PATH + '/throughput-receiver-linegraph.png')
 
 
 elif TEST_TYPE == 'x':

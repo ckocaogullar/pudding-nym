@@ -10,17 +10,17 @@ import config
 import logging
 import sys
 import os
-import math
+
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 # Check and save system arguments
-assert sys.argv[1] in ['throughput', 'latency',
-                       'surb_prep', 'surb_count'], "Test type must be 'throughput', 'latency' or 'surb_prep'"
+assert sys.argv[1] in ['test', 'surb_prep',
+                       'surb_count'], "Run type must be 'test', 'surb_prep' or 'surb_count'"
 assert sys.argv[1] in ['surb_prep', 'surb_count'] or len(
-    sys.argv) >= 3, "Receiver must take at least three parameters for tests: test type (latency or throughput), name of the log file and the number of messages per trial"
+    sys.argv) >= 3, "Receiver must take at least three parameters for tests: 'test' keyword, name of the log file and the number of messages per trial"
 
 test_with_surb = None
-if sys.argv[1] in ['throughput', 'latency']:
+if sys.argv[1] in ['test']:
     for i in range(len(sys.argv) - 1):
         if sys.argv[i] == '--surb':
             test_with_surb = sys.argv[i+1]
@@ -33,7 +33,7 @@ if sys.argv[1] in ['throughput', 'latency']:
 TEST_WITH_SURB = True if test_with_surb == 'TRUE' else False
 TEST_TYPE = sys.argv[1]
 
-if TEST_TYPE in ['throughput', 'latency']:
+if TEST_TYPE in ['test']:
     MESSAGE_PER_TRIAL = int(sys.argv[3])
 elif TEST_TYPE in ['surb_prep']:
     MESSAGE_PER_TRIAL = int(sys.argv[2])
@@ -46,21 +46,14 @@ else:
     surb_folder = 'without_surb/'
 
 if TEST_TYPE not in ['surb_count']:
-    LOG_PATH = TEST_TYPE + '_logs/' + \
+    LOG_PATH = 'test_logs/' + \
         sys.argv[2] + '/' + surb_folder
 
-if TEST_TYPE == 'throughput':
-    LOG_PATH += str(MESSAGE_PER_TRIAL)
-
+print(sys.argv[1])
+print(TEST_WITH_SURB)
+print(surb_folder)
 # For storing the test results on the run
-latency_data = {
-    "sent_surb_reply_text_time": dict(),
-    "received_text_time": dict(),
-    "received_surb_text_time": dict(),
-    'received_text_without_surb_time': dict(),
-    'received_text_with_surb_time': dict(),
-}
-throughput_data = dict()
+latency_data = {"received_text_time": dict()}
 
 prepared_surbs = {'surbs': [], 'duplicates': []}
 
@@ -75,9 +68,6 @@ def save_to_file(data, prep_surb=False):
     logging.info('[RECEIVER] Writing to file')
 
     if prep_surb:
-        # with open('prepared_surbs/surb.json', 'w+') as file:
-        #     json.dump(data, file)
-        #     file.close()
         with open('prepared_surbs/surb.json', 'r') as file:
             existing_surbs = json.load(file)
 
@@ -88,11 +78,11 @@ def save_to_file(data, prep_surb=False):
             json.dump(existing_surbs, file)
             file.close()
     else:
-        if not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[2]):
-            os.mkdir(TEST_TYPE + '_logs/' + sys.argv[2])
+        if not os.path.exists('test_logs/'):
+            os.mkdir('test_logs/')
 
-        if TEST_TYPE == 'throughput' and not os.path.exists(TEST_TYPE + '_logs/' + sys.argv[2] + '/' + surb_folder):
-            os.mkdir(TEST_TYPE + '_logs/' + sys.argv[2] + '/' + surb_folder)
+        if not os.path.exists('test_logs/' + sys.argv[2]):
+            os.mkdir('test_logs/' + sys.argv[2])
 
         if not os.path.exists(LOG_PATH):
             os.mkdir(LOG_PATH)
@@ -135,14 +125,16 @@ async def prepare_surbs():
             while count < 100:
                 await websocket.send(json.dumps(text_send))
                 count += 1
-                print(count)
 
+            logging.info(
+                '[RECEIVER] Sent {} SURBs addressed to myself'.format(count+1))
             count = 0
-            print('Now we wait')
+            logging.info('[RECEIVER] Now I wait for SURBs to arrive.')
+            
             while count < 100 and timeout_count < 3:
                 try:
                     message = json.loads(
-                        await asyncio.wait_for(websocket.recv(), timeout=10))
+                        await asyncio.wait_for(websocket.recv(), timeout=config.TIMEOUT))
                     timeout_count = 0
                 except asyncio.TimeoutError:
                     message = {'type': 'timeout'}
@@ -156,7 +148,7 @@ async def prepare_surbs():
                 else:
                     timeout_count = 0
                     surb = message['replySurb']
-                    print(surb)
+                    logging.info(surb)
                     if surb in prepared_surbs['surbs']:
                         prepared_surbs['duplicates'].append(surb)
                     else:
@@ -166,27 +158,26 @@ async def prepare_surbs():
             count = 0
 
 
-async def receive_single_text():
+async def receive_message():
     count = 0
     freq = config.INIT_FREQ
     timeout_count = 0
     total_message_num = MESSAGE_PER_TRIAL * \
         int(round((config.MAX_FREQ - config.INIT_FREQ) / config.FREQ_STEP) + 1)
-    print('total_message_num', total_message_num)
 
     # Prepare data dictionary
     while freq <= config.MAX_FREQ:
-        # latency_data["received_text_without_surb_time"][freq] = dict()
-        # latency_data["received_text_with_surb_time"][freq] = dict()
         latency_data["received_text_time"][freq] = dict()
         freq = round(freq + config.FREQ_STEP, 1)
 
+    # Connect to receiver client and wait for messages
     async with websockets.connect(config.RECEIVER_CLIENT_URI) as websocket:
         await websocket.send(self_address_request)
         self_address = json.loads(await websocket.recv())
         logging.info("[RECEIVER] Our address is: {}".format(
             self_address['address']))
 
+        # Wait for messages until all messages received or 10 consecutive messages have timed out
         while count < total_message_num and timeout_count < 10:
             try:
                 message = json.loads(
@@ -194,9 +185,10 @@ async def receive_single_text():
                 timeout_count = 0
             except asyncio.TimeoutError:
                 message = {'type': 'timeout'}
+
             if message['type'] == 'error':
                 logging.error(
-                    "[SENDER] Received error message from the mix network: {}".format(message))
+                    "[RECEIVER] Received error message from the mix network: {}".format(message))
             elif message['type'] == 'timeout':
                 timeout_count += 1
                 logging.warning(
@@ -209,55 +201,12 @@ async def receive_single_text():
                 latency_data["received_text_time"][freq][message_seq] = recv_time
             count += 1
 
-        logging.info('[RECEIVER] Finished receiving all messages')
+        logging.info('[RECEIVER] Finished receiving all messages.')
 
 
-async def receive_text_load():
-    start = 0
-    end = 0
-    timeout_count = 0
-    messages = dict()
-    label = "received_time"
-
-    async with websockets.connect(config.RECEIVER_CLIENT_URI) as websocket:
-        await websocket.send(self_address_request)
-        self_address = json.loads(await websocket.recv())
-        logging.info("[RECEIVER] Our address is: {}".format(
-            self_address['address']))
-
-        for i in range(MESSAGE_PER_TRIAL + 1):
-            if timeout_count < 10:
-                try:
-                    message = json.loads(
-                        await asyncio.wait_for(websocket.recv(), timeout=20))
-                    # Stop the timer when the MESSAGE_PER_TRIALth message is received
-                    end = time.time()
-
-                    messages[message['message']] = end
-                    logging.info(
-                        '[RECEIVER] Received message {}'.format(message))
-
-                except asyncio.TimeoutError:
-                    logging.info('[RECEIVER] Timeout.')
-                    timeout_count += 1
-
-                # Start the timer on the first received message
-                if i == 0:
-                    start = time.time()
-
-        throughput_data[label] = end - start
-        throughput_data['message_timings'] = messages
-        logging.info(
-            '[RECEIVER] It took {} seconds to receive {} messages'.format(throughput_data[label], MESSAGE_PER_TRIAL))
-
-
-if TEST_TYPE == 'latency':
-    # asyncio.get_event_loop().run_until_complete(reply_text())
-    asyncio.get_event_loop().run_until_complete(receive_single_text())
+if TEST_TYPE == 'test':
+    asyncio.get_event_loop().run_until_complete(receive_message())
     save_to_file(latency_data)
-elif TEST_TYPE == 'throughput':
-    asyncio.get_event_loop().run_until_complete(receive_text_load())
-    save_to_file(throughput_data)
 elif TEST_TYPE == 'surb_prep':
     asyncio.get_event_loop().run_until_complete(prepare_surbs())
     save_to_file(prepared_surbs, True)
