@@ -1,7 +1,7 @@
 # Custom
 performance/latency_logs/
 performance/throughput_logs/
-# performance/test_logs/
+performance/test_logs/
 performance/client_performance/
 performance/tcpdump/active/
 performance/tcpdump/idle/
