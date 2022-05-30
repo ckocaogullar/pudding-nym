@@ -5,6 +5,7 @@ performance/test_logs/
 performance/client_performance/
 performance/tcpdump/active/
 performance/tcpdump/idle/
+performance/prepared_surbs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
